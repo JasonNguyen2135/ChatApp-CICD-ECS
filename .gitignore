@@ -1,0 +1,15 @@
+chatapp_mobile/app/google-services.json
+
+**/target/
+**/*.class
+chatapp_backend/data/
+
+
+**/build/
+*.apk
+
+.idea/
+.vscode/
+.DS_Store
+terraform/.terraform/
+terraform/*.tfstate*

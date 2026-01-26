@@ -1,0 +1,38 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+    paths: [ "chatapp_mobile/**" ] # Chỉ chạy khi sửa code mobile
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Decode Google Services JSON
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > chatapp_mobile/app/google-services.json
+
+      - name: Grant Permission
+        run: chmod +x chatapp_mobile/gradlew
+
+      - name: Build APK with Injected URL
+        env:
+          # Link này sẽ được bơm vào BuildConfig
+          MOBILE_BASE_URL: http://${{ secrets.ALB_DNS_NAME }}/ 
+        run: |
+          cd chatapp_mobile
+          ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: chatapp-release
+          path: chatapp_mobile/app/build/outputs/apk/release/app-release-unsigned.apk
