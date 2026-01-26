@@ -3,8 +3,9 @@ name: Build Android APK
 on:
   push:
     branches: [ "main" ]
-    paths: [ "chatapp_mobile/**" ] # Chỉ chạy khi sửa code mobile
+    paths: [ "chatapp_mobile/**" ]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -24,16 +25,16 @@ jobs:
       - name: Grant Permission
         run: chmod +x chatapp_mobile/gradlew
 
-      - name: Build APK with Injected URL
+      - name: Build APK (Debug Version)
         env:
-          # Link này sẽ được bơm vào BuildConfig
           MOBILE_BASE_URL: http://${{ secrets.ALB_DNS_NAME }}/ 
         run: |
           cd chatapp_mobile
-          ./gradlew assembleRelease
+          # Đổi từ assembleRelease -> assembleDebug để có chữ ký mặc định
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: chatapp-release
-          path: chatapp_mobile/app/build/outputs/apk/release/app-debug.apk
+          name: chatapp-debug # Đổi tên artifact cho dễ phân biệt
+          path: chatapp_mobile/app/build/outputs/apk/debug/app-debug.apk
