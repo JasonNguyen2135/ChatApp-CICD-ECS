@@ -30,11 +30,14 @@ jobs:
           MOBILE_BASE_URL: http://${{ secrets.ALB_DNS_NAME }}/ 
         run: |
           cd chatapp_mobile
-          # Đổi từ assembleRelease -> assembleDebug để có chữ ký mặc định
+          # Chạy lệnh build debug để có chữ ký mặc định
           ./gradlew assembleDebug
+
+      - name: (DEBUG) List all APK files generated
+        run: find chatapp_mobile -name "*.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: chatapp-debug # Đổi tên artifact cho dễ phân biệt
-          path: chatapp_mobile/app/build/outputs/apk/debug/app-debug.apk
+          name: chatapp-debug
+          path: chatapp_mobile/**/*.apk
