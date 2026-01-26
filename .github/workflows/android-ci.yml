@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths: [ "chatapp_mobile/**" ] # Chỉ chạy khi sửa code mobile
-
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest

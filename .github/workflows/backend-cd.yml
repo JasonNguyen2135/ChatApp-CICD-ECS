@@ -4,6 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths: [ "chatapp_backend/**" ] # Chỉ chạy khi sửa code backend
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
