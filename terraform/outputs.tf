@@ -1,2 +1,9 @@
-output "ecr_url" { value = aws_ecr_repository.repo.repository_url }
-output "alb_dns" { value = aws_lb.main.dns_name }
+output "alb_dns_name" {
+  description = "DNS của Load Balancer để truy cập ứng dụng"
+  value       = module.alb.alb_dns_name
+}
+
+output "db_endpoint" {
+  description = "Endpoint của cơ sở dữ liệu RDS"
+  value       = module.rds.db_endpoint
+}
