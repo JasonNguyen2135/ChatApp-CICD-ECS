@@ -40,10 +40,12 @@ public class AuthController {
         user.setId(UUID.randomUUID().toString());
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
-        user.setNickname((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : ""));
+        
+        // Đảm bảo nickname không bị null
+        String name = (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
+        user.setNickname(name.trim().isEmpty() ? email : name.trim());
         
         userRepository.save(user);
-        // ✅ TRẢ VỀ JSON ĐỂ MOBILE KHÔNG BỊ LỖI PARSE
         return ResponseEntity.ok(Map.of("message", "User registered successfully"));
     }
 
@@ -65,7 +67,8 @@ public class AuthController {
     @GetMapping("/search")
     public ResponseEntity<List<User>> searchUsers(@RequestParam("query") String query) {
         List<User> users = userRepository.findAll().stream()
-                .filter(u -> u.getEmail().toLowerCase().contains(query.toLowerCase()))
+                .filter(u -> u.getEmail().toLowerCase().contains(query.toLowerCase()) || 
+                             (u.getNickname() != null && u.getNickname().toLowerCase().contains(query.toLowerCase())))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(users);
     }
