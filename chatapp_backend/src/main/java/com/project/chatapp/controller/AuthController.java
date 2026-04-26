@@ -35,7 +35,7 @@ public class AuthController {
         }
 
         User user = new User();
-        user.setUid(UUID.randomUUID().toString());
+        user.setId(UUID.randomUUID().toString()); // ĐÃ SỬA: dùng setId thay cho setUid
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         
@@ -50,11 +50,14 @@ public class AuthController {
 
         return userRepository.findByEmail(email)
                 .filter(user -> passwordEncoder.matches(password, user.getPassword()))
-                .map(user -> ResponseEntity.ok(Map.of(
-                        "token", jwtUtils.generateToken(user.getEmail(), user.getUid()),
-                        "userId", user.getUid(),
+                .map(user -> {
+                    String token = jwtUtils.generateToken(user.getEmail(), user.getId()); // ĐÃ SỬA: getId()
+                    return ResponseEntity.ok((Object) Map.of(
+                        "token", token,
+                        "userId", user.getId(), // ĐÃ SỬA: getId()
                         "email", user.getEmail()
-                )))
+                    ));
+                })
                 .orElse(ResponseEntity.status(401).body(Map.of("error", "Invalid credentials")));
     }
 }
