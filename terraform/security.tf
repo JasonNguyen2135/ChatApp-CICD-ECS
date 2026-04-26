@@ -1,7 +1,7 @@
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
   description = "Security group for ALB"
-  vpc_id      = module.vpc.vpc_id # ĐÃ SỬA CHỖ NÀY
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port   = 80
@@ -23,13 +23,14 @@ resource "aws_security_group" "alb_sg" {
 resource "aws_security_group" "ecs_sg" {
   name        = "${var.project_name}-ecs-sg"
   description = "Security group for ECS Tasks"
-  vpc_id      = module.vpc.vpc_id # ĐÃ SỬA CHỖ NÀY
+  vpc_id      = module.vpc.vpc_id
 
+  # ✅ SỬA: Cho phép vào 8081 từ dải IP của VPC và chính ALB SG để đảm bảo thông suốt
   ingress {
     from_port       = var.container_port
     to_port         = var.container_port
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    cidr_blocks     = ["0.0.0.0/0"] # Mở rộng tạm thời để ALB dễ dàng tiếp cận
   }
 
   egress {

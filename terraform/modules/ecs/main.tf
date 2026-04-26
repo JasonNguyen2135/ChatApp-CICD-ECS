@@ -21,7 +21,6 @@ resource "aws_ecr_repository" "repo" {
 
 resource "aws_ecs_cluster" "main" { name = "${var.project_name}-cluster" }
 
-# ✅ TẠO SẴN LOG GROUP ĐỂ APP KHÔNG PHẢI TỰ TẠO (TRÁNH LỖI QUYỀN)
 resource "aws_cloudwatch_log_group" "ecs_log_group" {
   name              = "/ecs/${var.project_name}"
   retention_in_days = 7
@@ -37,7 +36,6 @@ resource "aws_iam_role_policy_attachment" "ecs_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Cấp quyền FULL cho cả Execution Role và Task Role
 resource "aws_iam_role_policy" "ecs_extra_policy" {
   name = "${var.project_name}-extra-policy"
   role = aws_iam_role.ecs_exec_role.id
@@ -95,6 +93,10 @@ resource "aws_ecs_service" "backend_service" {
   task_definition = aws_ecs_task_definition.backend_task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  
+  # ✅ QUAN TRỌNG: Cho phép App khởi động trong 5 phút mà không bị kiểm tra sức khỏe
+  health_check_grace_period_seconds = 300 
+
   network_configuration {
     subnets = var.public_subnets
     security_groups = [var.ecs_sg_id]

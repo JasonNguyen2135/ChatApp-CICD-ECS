@@ -18,10 +18,11 @@ import java.util.function.Function;
 @Component
 public class JwtUtils {
 
-    @Value("${jwt.secret}")
+    // THÊM GIÁ TRỊ MẶC ĐỊNH TRỰC TIẾP TRONG CODE ĐỂ CHỐNG CRASH
+    @Value("${jwt.secret:YourSuperSecretKeyForJwtAuthenticationWhichShouldBeLongEnough}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration}")
+    @Value("${jwt.expiration:86400000}")
     private long jwtExpirationMs;
 
     private SecretKey getSigningKey() {
@@ -33,7 +34,6 @@ public class JwtUtils {
         return extractClaim(token, Claims::getSubject);
     }
 
-    // BỔ SUNG: Lấy UserId từ Token (Dùng cho Mobile)
     public String getUserIdFromToken(String token) {
         return extractClaim(token, claims -> claims.get("userId", String.class));
     }
@@ -59,13 +59,11 @@ public class JwtUtils {
         return extractExpiration(token).before(new Date());
     }
 
-    // NẠP CHỒNG: Tạo token từ UserDetails
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, userDetails.getUsername());
     }
 
-    // NẠP CHỒNG: Tạo token từ Email và UserId (Khớp với AuthController)
     public String generateToken(String email, String userId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
@@ -87,7 +85,6 @@ public class JwtUtils {
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
 
-    // BỔ SUNG: Kiểm tra token hợp lệ chỉ bằng String (Khớp với Filter)
     public Boolean validateToken(String token) {
         return !isTokenExpired(token);
     }

@@ -50,9 +50,10 @@ fun ChatScreen(navController: NavController, viewModel: ChatViewModel, otherUser
     val partnerStatus by viewModel.partnerStatus.collectAsState()
     val isUploading by viewModel.isUploading.collectAsState()
 
-    val contact = recentContacts.find { it["uid"] == otherUserId }
-    val displayName = contact?.get("nickname") ?: otherUserEmail
-    val isBlocked = contact?.get("isBlocked")?.toBoolean() ?: false
+    // ✅ FIX: Dùng thuộc tính của Object User
+    val contact = recentContacts.find { it.id == otherUserId }
+    val displayName = contact?.nickname ?: otherUserEmail
+    val isBlocked = contact?.isBlocked ?: false
 
     val zaloBlue = Color(0xFF0068FF)
     var text by remember { mutableStateOf("") }
@@ -62,28 +63,15 @@ fun ChatScreen(navController: NavController, viewModel: ChatViewModel, otherUser
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
-    // Launchers
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->     
         if (uri != null) viewModel.uploadFile(uri, context) { url ->
-            viewModel.sendMessage(otherUserId, otherUserEmail, "Đã gửi ảnh", "image", url, replyMessage); replyMessage = null
+            viewModel.sendMessage(otherUserId, otherUserEmail, "Ảnh", "image", url, replyMessage); replyMessage = null
         }
     }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) viewModel.uploadFile(uri, context) { url ->
-            viewModel.sendMessage(otherUserId, otherUserEmail, "Đã gửi file", "file", url, replyMessage); replyMessage = null
+            viewModel.sendMessage(otherUserId, otherUserEmail, "File", "file", url, replyMessage); replyMessage = null
         }
-    }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                // Mỗi khi màn hình hiện lên (bao gồm lúc quay lại), tải lại tin nhắn
-                viewModel.fetchChatMessages(otherUserId)
-                viewModel.listenToPartnerStatus(otherUserId)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(otherUserId) {
@@ -95,135 +83,43 @@ fun ChatScreen(navController: NavController, viewModel: ChatViewModel, otherUser
 
     Scaffold(
         topBar = {
-            Column(Modifier.background(zaloBlue).statusBarsPadding()) {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(displayName, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            val statusText = if (partnerStatus?.isOnline == true) "Đang hoạt động" else "Ngoại tuyến"
-                            Text(statusText, color = Color(0xFFE0E0E0), fontSize = 11.sp)
-                        }
-                    },
-                    navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
-                    actions = {
-                        IconButton(onClick = { navController.navigate("chat_info/$otherUserId/$otherUserEmail") }) {
-                            Icon(Icons.Default.Info, null, tint = Color.White)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-                )
-                if (isUploading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color.Yellow)
-            }
+            TopAppBar(
+                title = {
+                    Column(Modifier.clickable { navController.navigate("chat_info/$otherUserId/$otherUserEmail") }) {
+                        Text(displayName, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(if (partnerStatus?.isOnline == true) "Vừa mới truy cập" else "Ngoại tuyến", fontSize = 12.sp)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                },
+                actions = {
+                    IconButton(onClick = { /* Call */ }) { Icon(Icons.Default.Call, null) }
+                    IconButton(onClick = { /* Video */ }) { Icon(Icons.Default.VideoCall, null) }
+                    IconButton(onClick = { navController.navigate("chat_info/$otherUserId/$otherUserEmail") }) { Icon(Icons.Default.Menu, null) }
+                }
+            )
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().background(Color(0xFFE2E9F1))) {
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), state = listState, contentPadding = PaddingValues(8.dp)) {
                 items(messages) { msg ->
                     val isMe = msg.senderId == currentUser?.uid
-                    MessageBubbleExtended(
-                        msg = msg, isMe = isMe, time = viewModel.formatTime(msg.timestamp),
-                        onReply = { replyMessage = msg },
-                        onCopy = {
-                            val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clip.setPrimaryClip(ClipData.newPlainText("msg", msg.text))
-                            Toast.makeText(context, "Đã sao chép", Toast.LENGTH_SHORT).show()
-                        },
-                        onForward = { showForwardDialog = msg },
-                        onReact = { emoji -> viewModel.sendReaction(msg.id ?: 0, emoji) },
-                        onRevoke = { viewModel.revokeMessage(msg.id ?: 0) }
-                    )
+                    MessageBubble(msg, isMe, viewModel.formatTime(msg.timestamp))
                 }
             }
             if (!isBlocked) {
                 Surface(tonalElevation = 2.dp, color = Color.White) {
-                    Column {
-                        if (replyMessage != null) {
-                            Row(Modifier.fillMaxWidth().background(Color(0xFFEEEEEE)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.AutoMirrored.Filled.Reply, null, tint = zaloBlue)
-                                Text(replyMessage!!.text, Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                IconButton(onClick = { replyMessage = null }) { Icon(Icons.Default.Close, null) }
-                            }
-                        }
-                        Row(Modifier.padding(8.dp).imePadding(), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Icon(Icons.Default.Image, null, tint = Color.Gray) }
-                            IconButton(onClick = { filePicker.launch("*/*") }) { Icon(Icons.Default.AttachFile, null, tint = Color.Gray) }
-                            TextField(
-                                value = text, onValueChange = { text = it }, placeholder = { Text("Tin nhắn") },
-                                modifier = Modifier.weight(1f),
-                                colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
-                            )
-                            if (text.isNotBlank()) IconButton(onClick = { viewModel.sendMessage(otherUserId, otherUserEmail, text, "text", "", replyMessage); text = ""; replyMessage = null }) { Icon(Icons.Default.Send, null, tint = zaloBlue) }
-                        }
+                    Row(Modifier.padding(8.dp).imePadding(), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { Icon(Icons.Default.Image, null, tint = Color.Gray) }
+                        IconButton(onClick = { filePicker.launch("*/*") }) { Icon(Icons.Default.AttachFile, null, tint = Color.Gray) }
+                        TextField(
+                            value = text, onValueChange = { text = it }, placeholder = { Text("Tin nhắn") },
+                            modifier = Modifier.weight(1f),
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
+                        )
+                        if (text.isNotBlank()) IconButton(onClick = { viewModel.sendMessage(otherUserId, otherUserEmail, text, "text", "", replyMessage); text = ""; replyMessage = null }) { Icon(Icons.Default.Send, null, tint = zaloBlue) }
                     }
-                }
-            } else Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { Text("Bạn đã chặn người dùng này") }
-        }
-
-        if (showForwardDialog != null) {
-            ForwardDialog(
-                recentContacts = recentContacts,
-                onDismiss = { showForwardDialog = null },
-                onSend = { uid, email ->
-                    viewModel.forwardMessage(showForwardDialog!!, uid, email)
-                    showForwardDialog = null
-                    Toast.makeText(context, "Đã chuyển tiếp", Toast.LENGTH_SHORT).show()
-                }
-            )
-        }
-    }
-}
-
-// --- UI COMPONENTS ---
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun MessageBubbleExtended(
-    msg: ChatMessage, isMe: Boolean, time: String,
-    onReply: () -> Unit, onCopy: () -> Unit, onForward: () -> Unit, onReact: (String) -> Unit, onRevoke: () -> Unit
-) {
-    var showMenu by remember { mutableStateOf(false) }
-    val emojis = listOf("❤️", "😂", "👍", "😮", "😢")
-
-    Box(Modifier.fillMaxWidth(), contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart) {
-        Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
-            if (showMenu) {
-                Surface(tonalElevation = 4.dp, shape = RoundedCornerShape(20.dp), modifier = Modifier.padding(bottom = 4.dp)) {
-                    Row(Modifier.padding(4.dp)) { emojis.forEach { e -> Text(e, Modifier.clickable { onReact(e); showMenu = false }.padding(8.dp), fontSize = 20.sp) } }
-                }
-            }
-            Surface(
-                color = if (isMe) Color(0xFFD6F0FF) else Color.White,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.combinedClickable(onClick = {}, onLongClick = { showMenu = true }).widthIn(max = 280.dp)
-            ) {
-                Column(Modifier.padding(8.dp)) {
-                    if (msg.isRevoked) {
-                        Text("Tin nhắn đã bị thu hồi", color = Color.Gray, fontStyle = FontStyle.Italic)
-                    } else {
-                        if (msg.replyToText != null) {
-                            Text("Trả lời: ${msg.replyToText}", fontSize = 11.sp, color = Color.Gray, fontStyle = FontStyle.Italic)
-                            HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                        }
-                        if (msg.type == "image") {
-                            AsyncImage(model = msg.fileUrl, contentDescription = null, modifier = Modifier.clip(RoundedCornerShape(8.dp)).fillMaxWidth(), contentScale = ContentScale.FillWidth)
-                        } else if (msg.type == "file") {
-                            Row { Icon(Icons.Default.AttachFile, null); Text("File đính kèm", Modifier.padding(start = 8.dp)) }
-                        } else {
-                            Text(msg.text, fontSize = 15.sp)
-                        }
-                        if (!msg.reaction.isNullOrEmpty()) {
-                            Box(Modifier.align(Alignment.End).offset(y = 8.dp).background(Color.White, CircleShape).padding(2.dp)) { Text(msg.reaction!!, fontSize = 10.sp) }
-                        }
-                    }
-                }
-            }
-            Text(time, fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
-
-            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                if (!msg.isRevoked) {
-                    DropdownMenuItem(text = { Text("Trả lời") }, onClick = { onReply(); showMenu = false })
-                    DropdownMenuItem(text = { Text("Sao chép") }, onClick = { onCopy(); showMenu = false })
-                    DropdownMenuItem(text = { Text("Chuyển tiếp") }, onClick = { onForward(); showMenu = false })
-                    if (isMe) DropdownMenuItem(text = { Text("Thu hồi", color = Color.Red) }, onClick = { onRevoke(); showMenu = false })
                 }
             }
         }
@@ -231,21 +127,15 @@ fun MessageBubbleExtended(
 }
 
 @Composable
-fun ForwardDialog(recentContacts: List<Map<String, String>>, onDismiss: () -> Unit, onSend: (String, String) -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(16.dp), color = Color.White, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Chuyển tiếp đến:", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                LazyColumn(Modifier.heightIn(max = 300.dp).padding(vertical = 12.dp)) {
-                    items(recentContacts) { contact ->
-                        val name = contact["nickname"] ?: contact["email"] ?: "User"
-                        Row(Modifier.fillMaxWidth().clickable { onSend(contact["uid"]!!, contact["email"]!!) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF0068FF)), contentAlignment = Alignment.Center) { Text(name.take(1).uppercase(), color = Color.White) }
-                            Text(name, Modifier.padding(start = 12.dp), fontSize = 16.sp)
-                        }
-                    }
-                }
-                TextButton(onClick = onDismiss, Modifier.align(Alignment.End)) { Text("Hủy", color = Color.Gray) }
+fun MessageBubble(msg: ChatMessage, isMe: Boolean, time: String) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
+        Surface(
+            color = if (isMe) Color(0xFFC0D9FF) else Color.White,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(Modifier.padding(8.dp)) {
+                Text(msg.text, fontSize = 16.sp)
+                Text(time, fontSize = 10.sp, color = Color.Gray, modifier = Modifier.align(Alignment.End))
             }
         }
     }

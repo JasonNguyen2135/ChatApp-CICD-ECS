@@ -1,7 +1,7 @@
 package com.example.chatapp
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.clickable // Đảm bảo có import này
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ fun UserListScreen(navController: NavController, viewModel: ChatViewModel) {
     val recentContacts by viewModel.recentContacts.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
 
+    val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     val zaloBlue = Color(0xFF0068FF)
 
@@ -67,8 +69,7 @@ fun UserListScreen(navController: NavController, viewModel: ChatViewModel) {
                                 text = { Text("Đăng xuất", color = Color.Red) },
                                 onClick = {
                                     showMenu = false
-                                    viewModel.logout()
-                                    navController.navigate("login") { popUpTo(0) }
+                                    viewModel.logout(context, navController)
                                 },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Color.Red) }
                             )
@@ -88,7 +89,7 @@ fun UserListScreen(navController: NavController, viewModel: ChatViewModel) {
                 LazyColumn {
                     items(suggestions) { user ->
                         ContactItem(user.email, "Nhấn để nhắn tin") {
-                            navController.navigate("chat/${user.uid}/${user.email}")
+                            navController.navigate("chat/${user.id}/${user.email}")
                             query = ""
                         }
                     }
@@ -96,9 +97,10 @@ fun UserListScreen(navController: NavController, viewModel: ChatViewModel) {
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(recentContacts) { contact ->
-                        val name = contact["nickname"]?.ifEmpty { contact["email"] } ?: contact["email"] ?: ""
+                        // ✅ FIX: Dùng contact.id và contact.email (Object User)
+                        val name = contact.nickname?.ifEmpty { contact.email } ?: contact.email
                         ContactItem(name, "Nhấn để trò chuyện") {
-                            navController.navigate("chat/${contact["uid"]}/${contact["email"]}")
+                            navController.navigate("chat/${contact.id}/${contact.email}")
                         }
                     }
                 }
@@ -106,8 +108,6 @@ fun UserListScreen(navController: NavController, viewModel: ChatViewModel) {
         }
     }
 }
-
-// --- CÁC HÀM BỊ THIẾU ĐÃ ĐƯỢC BỔ SUNG Ở DƯỚI ---
 
 @Composable
 fun CustomSearchBar(value: String, onValueChange: (String) -> Unit, placeholder: String) {
@@ -134,6 +134,7 @@ fun CustomSearchBar(value: String, onValueChange: (String) -> Unit, placeholder:
 @Composable
 fun ContactItem(name: String, sub: String, onClick: () -> Unit) {
     Column {
+        // Modifier này giờ sẽ hoạt động chuẩn xác
         Row(
             Modifier.fillMaxWidth().background(Color.White).clickable { onClick() }.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically

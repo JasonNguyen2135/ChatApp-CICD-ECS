@@ -17,11 +17,16 @@ data class AuthResponse(
 )
 
 interface ApiService {
+    @Multipart
+    @POST("api/auth/register")
+    suspend fun register(
+        @Part("email") email: String,
+        @Part("password") password: String,
+        @Part file: MultipartBody.Part? = null
+    ): Response<Map<String, String>> // ✅ SỬA: Chấp nhận JSON Map
+
     @POST("api/auth/login")
     suspend fun login(@Body credentials: Map<String, String>): Response<AuthResponse>
-
-    @POST("api/auth/register")
-    suspend fun register(@Body credentials: Map<String, String>): Response<String>
 
     @GET("api/messages/{senderId}/{receiverId}")
     suspend fun getChatHistory(
@@ -32,6 +37,13 @@ interface ApiService {
     @Multipart
     @POST("api/files/upload")
     suspend fun uploadFile(@Part file: MultipartBody.Part): Response<UploadResponse>
+
+    @GET("api/auth/search")
+    suspend fun searchUsers(@Query("query") query: String): List<User>
+
+    // ✅ BỔ SUNG: API lấy danh sách những người đã chat
+    @GET("api/messages/conversations/{userId}")
+    suspend fun getConversations(@Path("userId") userId: String): List<User>
 }
 
 object RetrofitClient {
