@@ -33,16 +33,18 @@ public class AuthController {
             @RequestParam(value = "file", required = false) MultipartFile file) {
         
         if (userRepository.findByEmail(email).isPresent()) {
-            return ResponseEntity.badRequest().body("Email already exists");
+            return ResponseEntity.badRequest().body(Map.of("message", "Email already exists"));
         }
 
         User user = new User();
         user.setId(UUID.randomUUID().toString());
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
+        user.setNickname((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : ""));
         
         userRepository.save(user);
-        return ResponseEntity.ok("User registered successfully");
+        // ✅ TRẢ VỀ JSON ĐỂ MOBILE KHÔNG BỊ LỖI PARSE
+        return ResponseEntity.ok(Map.of("message", "User registered successfully"));
     }
 
     @PostMapping("/login")
@@ -52,18 +54,14 @@ public class AuthController {
 
         return userRepository.findByEmail(email)
                 .filter(user -> passwordEncoder.matches(password, user.getPassword()))
-                .map(user -> {
-                    String token = jwtUtils.generateToken(user.getEmail(), user.getId());
-                    return ResponseEntity.ok((Object) Map.of(
-                        "token", token,
+                .map(user -> ResponseEntity.ok((Object) Map.of(
+                        "token", jwtUtils.generateToken(user.getEmail(), user.getId()),
                         "userId", user.getId(),
                         "email", user.getEmail()
-                    ));
-                })
+                )))
                 .orElse(ResponseEntity.status(401).body(Map.of("error", "Invalid credentials")));
     }
 
-    // BỔ SUNG: API Tìm kiếm người dùng theo Email
     @GetMapping("/search")
     public ResponseEntity<List<User>> searchUsers(@RequestParam("query") String query) {
         List<User> users = userRepository.findAll().stream()
