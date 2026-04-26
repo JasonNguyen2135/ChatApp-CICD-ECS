@@ -10,8 +10,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -35,7 +37,7 @@ public class AuthController {
         }
 
         User user = new User();
-        user.setId(UUID.randomUUID().toString()); // ĐÃ SỬA: dùng setId thay cho setUid
+        user.setId(UUID.randomUUID().toString());
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         
@@ -51,13 +53,22 @@ public class AuthController {
         return userRepository.findByEmail(email)
                 .filter(user -> passwordEncoder.matches(password, user.getPassword()))
                 .map(user -> {
-                    String token = jwtUtils.generateToken(user.getEmail(), user.getId()); // ĐÃ SỬA: getId()
+                    String token = jwtUtils.generateToken(user.getEmail(), user.getId());
                     return ResponseEntity.ok((Object) Map.of(
                         "token", token,
-                        "userId", user.getId(), // ĐÃ SỬA: getId()
+                        "userId", user.getId(),
                         "email", user.getEmail()
                     ));
                 })
                 .orElse(ResponseEntity.status(401).body(Map.of("error", "Invalid credentials")));
+    }
+
+    // BỔ SUNG: API Tìm kiếm người dùng theo Email
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(@RequestParam("query") String query) {
+        List<User> users = userRepository.findAll().stream()
+                .filter(u -> u.getEmail().toLowerCase().contains(query.toLowerCase()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(users);
     }
 }
