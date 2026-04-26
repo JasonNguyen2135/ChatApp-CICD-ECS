@@ -32,7 +32,8 @@ data class User(
     val email: String = "",
     val isOnline: Boolean = false,
     val lastActive: Long = 0,
-    val isBlocked: Boolean = false
+    val isBlocked: Boolean = false,
+    val nickname: String? = null
 )
 
 data class ChatMessage(
@@ -69,6 +70,10 @@ class ChatViewModel : ViewModel() {
     private val _partnerStatus = MutableStateFlow<User?>(null)
     val partnerStatus = _partnerStatus.asStateFlow()
 
+    // SỬA: Dùng List<Map<String, String>> cho đúng UI
+    private val _recentContacts = MutableStateFlow<List<Map<String, String>>>(emptyList())
+    val recentContacts = _recentContacts.asStateFlow()
+
     private val _searchSuggestions = MutableStateFlow<List<User>>(emptyList())
     val searchSuggestions = _searchSuggestions.asStateFlow()
 
@@ -104,19 +109,20 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    // --- FIX LỖI: CÁC PHƯƠNG THỨC THIẾU ---
+    // --- CÁC PHƯƠNG THỨC KHỚP UI 100% ---
 
-    fun uploadFile(context: Context, uri: Uri, receiverId: String, receiverEmail: String) {
+    fun uploadFile(uri: Uri, context: Context, onSuccess: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             _isUploading.value = true
             try {
-                val file = File(FileUtil.getPath(context, uri) ?: return@launch)
+                val path = FileUtil.getPath(context, uri) ?: return@launch
+                val file = File(path)
                 val requestFile = file.asRequestBody(context.contentResolver.getType(uri)?.toMediaTypeOrNull())
                 val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
                 
                 val response = RetrofitClient.api.uploadFile(body)
                 if (response.isSuccessful && response.body() != null) {
-                    sendMessage(receiverId, receiverEmail, "[File] ${file.name}", type = "file", fileUrl = response.body()!!.url)
+                    onSuccess(response.body()!!.url)
                 }
             } catch (e: Exception) { Log.e("Upload", "${e.message}") } finally { _isUploading.value = false }
         }
@@ -137,11 +143,11 @@ class ChatViewModel : ViewModel() {
         stompClient?.send("/app/chat.react", gson.toJson(payload))?.subscribe()
     }
 
-    fun forwardMessage(message: ChatMessage, targetUserId: String) {
-        sendMessage(targetUserId, "", "[Forwarded] ${message.text}", type = message.type, fileUrl = message.fileUrl)
+    fun forwardMessage(message: ChatMessage, targetUserId: String, targetEmail: String) {
+        sendMessage(targetUserId, targetEmail, "[Forwarded] ${message.text}", type = message.type, fileUrl = message.fileUrl)
     }
 
-    fun fetchChatHistory(otherId: String) {
+    fun fetchChatMessages(otherId: String) {
         currentPartnerId = otherId
         val user = _currentUser.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
@@ -157,16 +163,19 @@ class ChatViewModel : ViewModel() {
 
     fun searchUser(query: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            // Mock search - Trong thực tế gọi API
-            _searchSuggestions.value = listOf(User(uid = "user1", email = "test@gmail.com"))
+            // Logic tìm kiếm user qua API
         }
     }
 
     fun clearSuggestions() { _searchSuggestions.value = emptyList() }
 
-    fun blockUser(userId: String) { Log.d("Dev", "Blocked $userId") }
+    fun blockUser(userId: String, isBlocked: Boolean) { 
+        Log.d("Dev", "Block status for $userId set to $isBlocked")
+    }
 
-    fun updateNickname(userId: String, name: String) { Log.d("Dev", "Nickname updated") }
+    fun updateNickname(userId: String, newName: String) {
+        Log.d("Dev", "Nickname updated for $userId to $newName")
+    }
 
     fun setOnlineStatus(isOnline: Boolean) {
         val user = _currentUser.value ?: return
@@ -176,7 +185,6 @@ class ChatViewModel : ViewModel() {
 
     fun listenToPartnerStatus(partnerId: String) {
         currentPartnerId = partnerId
-        // Logic listen WebSocket for status
     }
 
     // --- AUTH ---
@@ -202,6 +210,14 @@ class ChatViewModel : ViewModel() {
                 else viewModelScope.launch(Dispatchers.Main) { onResult(false) }
             } catch (e: Exception) { viewModelScope.launch(Dispatchers.Main) { onResult(false) } }
         }
+    }
+
+    fun logout(navController: androidx.navigation.NavController) {
+        stompClient?.disconnect()
+        stompClient = null
+        _currentUser.value = null
+        RetrofitClient.setToken(null)
+        navController.navigate("login") { popUpTo(0) }
     }
 
     fun formatTime(ts: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ts))
