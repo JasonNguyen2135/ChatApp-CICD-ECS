@@ -2,7 +2,7 @@ variable "project_name" {}
 variable "vpc_id" {}
 variable "public_subnets" { type = list(string) }
 variable "container_port" {}
-variable "alb_sg_id" {}
+variable "ecs_sg_id" {} # Khai báo biến mới thay cho alb_sg_id (vì ECS chỉ cần ecs_sg_id)
 variable "target_group_arn" {}
 variable "cpu" {}
 variable "memory" { }
@@ -51,25 +51,6 @@ resource "aws_iam_role_policy" "ecs_extra_policy" {
   })
 }
 
-resource "aws_security_group" "ecs_sg" {
-  name   = "${var.project_name}-ecs-sg"
-  vpc_id = var.vpc_id
-
-  ingress {
-    from_port       = var.container_port
-    to_port         = var.container_port
-    protocol        = "tcp"
-    security_groups = [var.alb_sg_id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
 resource "aws_ecs_task_definition" "backend_task" {
   family                   = "${var.project_name}-task"
   network_mode             = "awsvpc"
@@ -85,7 +66,7 @@ resource "aws_ecs_task_definition" "backend_task" {
     portMappings = [{ containerPort = var.container_port, hostPort = var.container_port }]
     environment = [
         { name = "SERVER_PORT", value = tostring(var.container_port) },
-        { name = "SPRING_DATASOURCE_URL", value = "jdbc:postgresql://${var.db_endpoint}/${var.db_name}" },
+        { name = "SPRING_DATASOURCE_URL", value = "jdbc:postgresql://${var.db_endpoint}/${var.db_name}" },      
         { name = "SPRING_DATASOURCE_USERNAME", value = var.db_username },
         { name = "SPRING_JPA_HIBERNATE_DDL_AUTO", value = "update" },
         { name = "AWS_S3_BUCKET", value = var.s3_bucket_name },
@@ -110,7 +91,7 @@ resource "aws_ecs_service" "backend_service" {
   launch_type     = "FARGATE"
   network_configuration {
     subnets = var.public_subnets
-    security_groups = [aws_security_group.ecs_sg.id]
+    security_groups = [var.ecs_sg_id] # Dùng biến truyền vào từ Root
     assign_public_ip = true
   }
   load_balancer {
@@ -143,4 +124,4 @@ resource "aws_appautoscaling_policy" "ecs_policy_cpu" {
   }
 }
 
-output "ecs_sg_id" { value = aws_security_group.ecs_sg.id }
+output "ecr_repository_url" { value = aws_ecr_repository.repo.repository_url }

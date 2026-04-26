@@ -6,14 +6,14 @@ variable "db_username" {}
 variable "db_password" {}
 variable "ecs_sg_id" {}
 
-resource "aws_db_subnet_group" "db_subnet_group" {
+resource "aws_db_subnet_group" "postgres" {
   name       = "${var.project_name}-db-subnet-group"
   subnet_ids = var.private_subnets
-  tags = { Name = "${var.project_name}-db-subnet-group" }
+  tags       = { Name = "${var.project_name}-db-subnet-group" }
 }
 
-resource "aws_security_group" "db_sg" {
-  name   = "${var.project_name}-db-sg"
+resource "aws_security_group" "rds_sg" {
+  name   = "${var.project_name}-rds-sg"
   vpc_id = var.vpc_id
 
   ingress {
@@ -35,16 +35,16 @@ resource "aws_db_instance" "postgres" {
   identifier           = "${var.project_name}-db"
   allocated_storage    = 20
   storage_type         = "gp2"
-  engine              = "postgres"
-  engine_version      = "16.1"
-  instance_class      = "db.t3.micro"
-  db_name             = var.db_name
-  username            = var.db_username
-  password            = var.db_password
-  db_subnet_group_name = aws_db_subnet_group.db_subnet_group.name
-  vpc_security_group_ids = [aws_security_group.db_sg.id]
+  engine               = "postgres"
+  engine_version       = "15" # ✅ CHỈ ĐỂ "15": AWS SẼ TỰ CHỌN BẢN VÁ (VD 15.10) CÓ SẴN TRONG REGION
+  instance_class       = "db.t3.micro"
+  db_name              = var.db_name
+  username             = var.db_username
+  password             = var.db_password
+  db_subnet_group_name = aws_db_subnet_group.postgres.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
   skip_final_snapshot  = true
-  publicly_accessible = false
+  publicly_accessible  = false
 }
 
 output "db_endpoint" { value = aws_db_instance.postgres.endpoint }

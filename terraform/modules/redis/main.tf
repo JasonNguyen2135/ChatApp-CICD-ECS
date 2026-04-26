@@ -1,7 +1,7 @@
 variable "project_name" {}
 variable "vpc_id" {}
 variable "private_subnets" { type = list(string) }
-variable "ecs_sg_id" {}
+variable "ecs_sg_id" {} # Khai báo biến nhận từ ngoài
 
 resource "aws_elasticache_subnet_group" "main" {
   name       = "${var.project_name}-redis-subnets"
@@ -16,7 +16,7 @@ resource "aws_security_group" "redis_sg" {
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
-    security_groups = [var.ecs_sg_id]
+    security_groups = [var.ecs_sg_id] # Chỉ cho phép ECS gọi vào
   }
 
   egress {

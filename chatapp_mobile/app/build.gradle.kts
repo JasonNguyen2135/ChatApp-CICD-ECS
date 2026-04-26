@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.gms.google-services")
+    // ĐÃ GỠ BỎ GOOGLE SERVICES PLUGIN
 }
 
 android {
@@ -26,18 +26,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Lấy URL từ GitHub Actions Environment
             val mobileUrl = System.getenv("MOBILE_BASE_URL") ?: "http://localhost:8081/"
             buildConfigField("String", "BASE_URL", "\"$mobileUrl\"")
         }
         debug {
-            // URL mặc định khi bạn code và chạy thử tại máy local
-            buildConfigField("String", "BASE_URL", "\"http://192.168.1.224:8081/\"")
+            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8081/\"")
         }
     }
 
     compileOptions {
-        // Nâng lên Java 17 để đồng bộ với hệ thống Java 21
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -48,7 +45,6 @@ android {
 
     buildFeatures {
         compose = true
-        // Bắt buộc bật thuộc tính này để sử dụng được BuildConfig trong code
         buildConfig = true
     }
 }
@@ -68,21 +64,17 @@ dependencies {
     implementation("androidx.compose.runtime:runtime:1.6.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    // Firebase (Đã dọn dẹp trùng lặp)
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-storage-ktx")
+    // ĐÃ GỠ BỎ TOÀN BỘ FIREBASE DEPENDENCIES
 
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.5.0")
 
-    // Networking: Retrofit & Gson (Dùng cho API History)
+    // Networking: Retrofit & Gson (Dùng cho JWT Auth và API History)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // Networking: STOMP & RxJava (Dùng cho Chat Realtime)
+    // Networking: STOMP & RxJava (Dùng cho Chat Realtime qua WebSocket)
     implementation("com.github.NaikSoftware:StompProtocolAndroid:1.6.6")
     implementation("io.reactivex.rxjava2:rxandroid:2.1.1")
     implementation("io.reactivex.rxjava2:rxjava:2.2.21")

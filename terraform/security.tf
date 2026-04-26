@@ -1,6 +1,7 @@
 resource "aws_security_group" "alb_sg" {
-  name   = "${var.project_name}-alb-sg"
-  vpc_id = aws_vpc.main.id
+  name        = "${var.project_name}-alb-sg"
+  description = "Security group for ALB"
+  vpc_id      = module.vpc.vpc_id # ĐÃ SỬA CHỖ NÀY
 
   ingress {
     from_port   = 80
@@ -15,11 +16,14 @@ resource "aws_security_group" "alb_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = { Name = "${var.project_name}-alb-sg" }
 }
 
 resource "aws_security_group" "ecs_sg" {
-  name   = "${var.project_name}-ecs-sg"
-  vpc_id = aws_vpc.main.id
+  name        = "${var.project_name}-ecs-sg"
+  description = "Security group for ECS Tasks"
+  vpc_id      = module.vpc.vpc_id # ĐÃ SỬA CHỖ NÀY
 
   ingress {
     from_port       = var.container_port
@@ -34,4 +38,6 @@ resource "aws_security_group" "ecs_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = { Name = "${var.project_name}-ecs-sg" }
 }
