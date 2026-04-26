@@ -4,13 +4,13 @@ import com.project.chatapp.config.JwtUtils;
 import com.project.chatapp.model.User;
 import com.project.chatapp.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -22,43 +22,39 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
 
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
-        String password = request.get("password");
-
+    @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> register(
+            @RequestParam("email") String email,
+            @RequestParam("password") String password,
+            @RequestParam(value = "firstName", required = false) String firstName,
+            @RequestParam(value = "lastName", required = false) String lastName,
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+        
         if (userRepository.findByEmail(email).isPresent()) {
             return ResponseEntity.badRequest().body("Email already exists");
         }
 
-        User user = User.builder()
-                .id(UUID.randomUUID().toString())
-                .email(email)
-                .password(passwordEncoder.encode(password))
-                .build();
+        User user = new User();
+        user.setUid(UUID.randomUUID().toString());
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+        
         userRepository.save(user);
-
         return ResponseEntity.ok("User registered successfully");
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
-        String email = request.get("email");
-        String password = request.get("password");
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+        String email = credentials.get("email");
+        String password = credentials.get("password");
 
-        Optional<User> userOpt = userRepository.findByEmail(email);
-        if (userOpt.isPresent() && passwordEncoder.matches(password, userOpt.get().getPassword())) {
-            User user = userOpt.get();
-            String token = jwtUtils.generateToken(user.getId(), user.getEmail());
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("token", token);
-            response.put("userId", user.getId());
-            response.put("email", user.getEmail());
-            
-            return ResponseEntity.ok(response);
-        }
-
-        return ResponseEntity.status(401).body("Invalid email or password");
+        return userRepository.findByEmail(email)
+                .filter(user -> passwordEncoder.matches(password, user.getPassword()))
+                .map(user -> ResponseEntity.ok(Map.of(
+                        "token", jwtUtils.generateToken(user.getEmail(), user.getUid()),
+                        "userId", user.getUid(),
+                        "email", user.getEmail()
+                )))
+                .orElse(ResponseEntity.status(401).body(Map.of("error", "Invalid credentials")));
     }
 }
