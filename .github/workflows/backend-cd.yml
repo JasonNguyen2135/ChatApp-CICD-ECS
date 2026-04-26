@@ -27,19 +27,23 @@ jobs:
       - name: Build and Push Image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }} # Dùng Secret bạn vừa tạo
+          # ✅ SỬA: Lấy tên repo chuẩn (rút gọn)
+          REPO_NAME: chatapp-nexus-repo
           IMAGE_TAG: ${{ github.sha }}
         run: |
           cd chatapp_backend
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          # Tag bản commit SHA
+          docker build -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG .
+          # Tag bản latest
+          docker build -t $ECR_REGISTRY/$REPO_NAME:latest .
+          # Push cả hai
+          docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$REPO_NAME:latest
 
       - name: Deploy to Amazon ECS
         env:
-          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }} # Dùng Secret
-          ECS_SERVICE: ${{ secrets.ECS_SERVICE }} # Dùng Secret
+          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region $AWS_REGION
