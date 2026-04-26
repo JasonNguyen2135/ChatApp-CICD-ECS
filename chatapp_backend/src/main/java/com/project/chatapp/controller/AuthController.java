@@ -4,11 +4,9 @@ import com.project.chatapp.config.JwtUtils;
 import com.project.chatapp.model.User;
 import com.project.chatapp.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -24,13 +22,13 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
 
-    @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> register(
-            @RequestParam("email") String email,
-            @RequestParam("password") String password,
-            @RequestParam(value = "firstName", required = false) String firstName,
-            @RequestParam(value = "lastName", required = false) String lastName,
-            @RequestParam(value = "file", required = false) MultipartFile file) {
+    // ✅ SỬA: Chuyển sang nhận @RequestBody JSON
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String password = request.get("password");
+        String firstName = request.get("firstName");
+        String lastName = request.get("lastName");
         
         if (userRepository.findByEmail(email).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Email already exists"));
@@ -41,7 +39,6 @@ public class AuthController {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         
-        // Đảm bảo nickname không bị null
         String name = (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
         user.setNickname(name.trim().isEmpty() ? email : name.trim());
         
