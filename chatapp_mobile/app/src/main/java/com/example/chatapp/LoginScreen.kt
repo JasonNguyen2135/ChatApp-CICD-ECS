@@ -1,14 +1,9 @@
 package com.example.chatapp
 
-import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -17,9 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -28,7 +21,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.rememberAsyncImagePainter
 
 @Composable
 fun LoginScreen(navController: NavController, viewModel: ChatViewModel) {
@@ -36,7 +28,6 @@ fun LoginScreen(navController: NavController, viewModel: ChatViewModel) {
     var password by remember { mutableStateOf("") }
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     
     var isLoginMode by remember { mutableStateOf(true) }
     var isLoading by remember { mutableStateOf(false) }
@@ -44,19 +35,6 @@ fun LoginScreen(navController: NavController, viewModel: ChatViewModel) {
 
     val context = LocalContext.current
     val zaloBlue = Color(0xFF0068FF)
-
-    // Tự động kiểm tra session khi mở màn hình
-    LaunchedEffect(Unit) {
-        viewModel.checkSavedSession(context) { success ->
-            if (success) {
-                navController.navigate("user_list") { popUpTo("login") { inclusive = true } }
-            }
-        }
-    }
-
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        selectedImageUri = uri
-    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -68,18 +46,6 @@ fun LoginScreen(navController: NavController, viewModel: ChatViewModel) {
         Spacer(modifier = Modifier.height(32.dp))
 
         if (!isLoginMode) {
-            Box(
-                Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFEEEEEE)).clickable { photoPicker.launch("image/*") },
-                contentAlignment = Alignment.Center
-            ) {
-                if (selectedImageUri != null) {
-                    Image(painter = rememberAsyncImagePainter(selectedImageUri), contentDescription = null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                } else {
-                    Icon(Icons.Default.AddAPhoto, null, tint = Color.Gray)
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            
             Row(Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = firstName, onValueChange = { firstName = it },
@@ -136,7 +102,8 @@ fun LoginScreen(navController: NavController, viewModel: ChatViewModel) {
                     if (isLoginMode) {
                         viewModel.login(cleanEmail, cleanPass, context, onResult)
                     } else {
-                        viewModel.signUp(cleanEmail, cleanPass, firstName, lastName, selectedImageUri, context, onResult)
+                        // GỬI JSON CHO ĐĂNG KÝ
+                        viewModel.signUp(cleanEmail, cleanPass, firstName, lastName, context, onResult)
                     }
                 }
             },

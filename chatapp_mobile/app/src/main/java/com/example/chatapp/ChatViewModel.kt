@@ -15,11 +15,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import ua.naiksoftware.stomp.Stomp
 import ua.naiksoftware.stomp.StompClient
 import ua.naiksoftware.stomp.dto.LifecycleEvent
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,7 +35,9 @@ data class User(
     val lastActive: Long = 0,
     val isBlocked: Boolean = false,
     val nickname: String? = null
-)
+) {
+    val uid: String get() = id
+}
 
 data class ChatMessage(
     @SerializedName("id") val id: Long? = null,
@@ -79,7 +82,6 @@ class ChatViewModel : ViewModel() {
     private val _isUploading = MutableStateFlow(false)
     val isUploading = _isUploading.asStateFlow()
 
-    // --- SESSION ---
     fun checkSavedSession(context: Context, onResult: (Boolean) -> Unit) {
         val prefs = context.getSharedPreferences("chatapp", Context.MODE_PRIVATE)
         val token = prefs.getString("token", null)
@@ -102,54 +104,40 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    // --- WS ---
-    private fun connectWebSocket() {
+    fun connectWebSocket() {
         val user = _currentUser.value ?: return
         if (stompClient != null) { stompClient?.disconnect() }
 
         val headers = mutableMapOf("Authorization" to "Bearer ${user.token}")
         stompClient = Stomp.over(Stomp.ConnectionProvider.OKHTTP, NetworkConfig.WS_URL, headers)
-        stompClient?.lifecycle()?.subscribe { event ->
+        stompClient?.lifecycle()?.subscribe({ event ->
             if (event.type == LifecycleEvent.Type.ERROR) {
                 viewModelScope.launch { delay(5000); connectWebSocket() }
             }
-        }
+        }, { Log.e("WS", "Error") })
         stompClient?.connect()
 
-        stompClient?.topic("/topic/messages/${user.uid}")?.subscribe { topicMsg ->
+        stompClient?.topic("/topic/messages/${user.uid}")?.subscribe({ topicMsg ->
             viewModelScope.launch(Dispatchers.Main) {
                 try {
                     val newMsg = gson.fromJson(topicMsg.payload, ChatMessage::class.java)
                     val list = _messages.value.toMutableList()
-                    
-                    // ✅ FIX NHÂN ĐÔI: Lọc dựa trên ID hoặc nội dung
-                    if (list.none { it.id == newMsg.id || (it.id == null && it.text == newMsg.text && Math.abs(it.timestamp - newMsg.timestamp) < 2000) }) {
-                        list.add(newMsg)
-                        _messages.value = list.sortedBy { it.timestamp }
-                    } else if (newMsg.id != null) {
-                        // Cập nhật tin nhắn tạm thời thành tin nhắn chính thức (có ID)
-                        val idx = list.indexOfFirst { it.id == null && it.text == newMsg.text }
-                        if (idx != -1) {
-                            list[idx] = newMsg
-                            _messages.value = list
-                        }
-                    }
+                    val tempIdx = list.indexOfFirst { it.id == null && it.text == newMsg.text && Math.abs(it.timestamp - newMsg.timestamp) < 5000 }
+                    if (tempIdx != -1) list[tempIdx] = newMsg else if (list.none { it.id == newMsg.id }) list.add(newMsg)
+                    _messages.value = list.sortedBy { it.timestamp }
+                    fetchConversations()
                 } catch (e: Exception) { Log.e("WS", "Error parsing") }
             }
-        }
+        }, { Log.e("WS", "Topic error") })
     }
 
-    // --- ACTIONS ---
     fun sendMessage(receiverId: String, receiverEmail: String, content: String, type: String = "text", fileUrl: String = "", replyTo: ChatMessage? = null) {
         val user = _currentUser.value ?: return
         val msg = ChatMessage(text = content, senderId = user.uid, receiverId = receiverId, type = type, fileUrl = fileUrl, replyToId = replyTo?.id?.toString(), replyToText = replyTo?.text)
-        
-        // Optimistic update
         val list = _messages.value.toMutableList()
         list.add(msg)
         _messages.value = list
-
-        stompClient?.send("/app/chat.sendMessage", gson.toJson(msg))?.subscribe({}, { Log.e("WS", "Failed to send") })
+        stompClient?.send("/app/chat.sendMessage", gson.toJson(msg))?.subscribe({}, { Log.e("WS", "Send error") })
     }
 
     fun fetchChatMessages(otherId: String) {
@@ -157,7 +145,7 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 _messages.value = RetrofitClient.api.getChatHistory(user.uid, otherId)
-            } catch (e: Exception) { Log.e("API", "Failed to load history") }
+            } catch (e: Exception) { Log.e("API", "History error") }
         }
     }
 
@@ -166,20 +154,7 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 _recentContacts.value = RetrofitClient.api.getConversations(user.uid)
-            } catch (e: Exception) { Log.e("API", "Failed to load conversations") }
-        }
-    }
-
-    fun uploadFile(uri: Uri, context: Context, onSuccess: (String) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _isUploading.value = true
-            try {
-                val body = FileUtil.prepareFilePart(context, uri) ?: return@launch
-                val response = RetrofitClient.api.uploadFile(body)
-                if (response.isSuccessful && response.body() != null) {
-                    viewModelScope.launch(Dispatchers.Main) { onSuccess(response.body()!!.url) }
-                }
-            } catch (e: Exception) { Log.e("Upload", "Error") } finally { _isUploading.value = false }
+            } catch (e: Exception) { Log.e("API", "Conv error") }
         }
     }
 
@@ -207,18 +182,23 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun signUp(email: String, pass: String, fName: String, lName: String, uri: Uri?, context: Context, onResult: (Boolean) -> Unit) {
+    // ✅ SỬA: Gửi JSON Map cho Register
+    fun signUp(email: String, pass: String, fName: String, lName: String, context: Context, onResult: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val eReq = email.toRequestBody("text/plain".toMediaTypeOrNull())
-                val pReq = pass.toRequestBody("text/plain".toMediaTypeOrNull())
-                val iPart = if (uri != null) FileUtil.prepareFilePart(context, uri) else null
-                
-                // Gửi tên qua header hoặc params (tùy backend, ở đây dùng params thô qua RequestBody nếu cần, nhưng ApiService đang để Part string)
-                if (RetrofitClient.api.register(email, pass, iPart).isSuccessful) {
-                    login(email, pass, context, onResult)
-                } else viewModelScope.launch(Dispatchers.Main) { onResult(false) }
-            } catch (e: Exception) { viewModelScope.launch(Dispatchers.Main) { onResult(false) } }
+                val data = mapOf(
+                    "email" to email,
+                    "password" to pass,
+                    "firstName" to fName,
+                    "lastName" to lName
+                )
+                val res = RetrofitClient.api.register(data)
+                if (res.isSuccessful) login(email, pass, context, onResult)
+                else viewModelScope.launch(Dispatchers.Main) { onResult(false) }
+            } catch (e: Exception) { 
+                Log.e("SignUp", "Error: ${e.message}")
+                viewModelScope.launch(Dispatchers.Main) { onResult(false) } 
+            }
         }
     }
 
@@ -226,6 +206,19 @@ class ChatViewModel : ViewModel() {
         stompClient?.disconnect(); _currentUser.value = null; RetrofitClient.setToken(null)
         context.getSharedPreferences("chatapp", Context.MODE_PRIVATE).edit().clear().apply()
         navController.navigate("login") { popUpTo(0) }
+    }
+
+    fun uploadFile(uri: Uri, context: Context, onSuccess: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isUploading.value = true
+            try {
+                val body = FileUtil.prepareFilePart(context, uri) ?: return@launch
+                val response = RetrofitClient.api.uploadFile(body)
+                if (response.isSuccessful && response.body() != null) {
+                    viewModelScope.launch(Dispatchers.Main) { onSuccess(response.body()!!.url) }
+                }
+            } catch (e: Exception) { Log.e("Upload", "Error") } finally { _isUploading.value = false }
+        }
     }
 
     fun clearSuggestions() { _searchSuggestions.value = emptyList() }

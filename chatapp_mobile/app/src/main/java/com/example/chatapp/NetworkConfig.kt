@@ -1,9 +1,8 @@
 package com.example.chatapp
 
 object NetworkConfig {
-    // ✅ ALB trỏ về cổng 80 mặc định
-    const val BASE_URL = "http://chatapp-nexus-alb-1541337314.ap-southeast-1.elb.amazonaws.com/"
-    
-    // ✅ WebSocket cũng đi qua cổng 80
-    const val WS_URL = "ws://chatapp-nexus-alb-1541337314.ap-southeast-1.elb.amazonaws.com/ws/websocket"
+    // ✅ Lấy URL từ BuildConfig (được truyền vào lúc build CI)
+    // Nếu build local không có biến, nó sẽ lấy địa chỉ ALB mặc định của bạn
+    val BASE_URL = BuildConfig.BASE_URL
+    val WS_URL = BuildConfig.WS_URL
 }

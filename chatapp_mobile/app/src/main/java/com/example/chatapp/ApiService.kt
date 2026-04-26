@@ -1,7 +1,6 @@
 package com.example.chatapp
 
 import okhttp3.Interceptor
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -17,13 +16,9 @@ data class AuthResponse(
 )
 
 interface ApiService {
-    @Multipart
+    // ✅ SỬA: Chuyển sang @Body để gửi JSON
     @POST("api/auth/register")
-    suspend fun register(
-        @Part("email") email: String,
-        @Part("password") password: String,
-        @Part file: MultipartBody.Part? = null
-    ): Response<Map<String, String>> // ✅ SỬA: Chấp nhận JSON Map
+    suspend fun register(@Body data: Map<String, String>): Response<Map<String, String>>
 
     @POST("api/auth/login")
     suspend fun login(@Body credentials: Map<String, String>): Response<AuthResponse>
@@ -36,28 +31,22 @@ interface ApiService {
 
     @Multipart
     @POST("api/files/upload")
-    suspend fun uploadFile(@Part file: MultipartBody.Part): Response<UploadResponse>
+    suspend fun uploadFile(@Part file: okhttp3.MultipartBody.Part): Response<UploadResponse>
 
     @GET("api/auth/search")
     suspend fun searchUsers(@Query("query") query: String): List<User>
 
-    // ✅ BỔ SUNG: API lấy danh sách những người đã chat
     @GET("api/messages/conversations/{userId}")
     suspend fun getConversations(@Path("userId") userId: String): List<User>
 }
 
 object RetrofitClient {
     private var token: String? = null
-
-    fun setToken(newToken: String?) {
-        token = newToken
-    }
+    fun setToken(newToken: String?) { token = newToken }
 
     private val authInterceptor = Interceptor { chain ->
         val request = chain.request().newBuilder()
-        token?.let {
-            request.addHeader("Authorization", "Bearer $it")
-        }
+        token?.let { request.addHeader("Authorization", "Bearer $it") }
         chain.proceed(request.build())
     }
 
