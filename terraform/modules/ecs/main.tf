@@ -2,7 +2,7 @@ variable "project_name" {}
 variable "vpc_id" {}
 variable "public_subnets" { type = list(string) }
 variable "container_port" {}
-variable "ecs_sg_id" {} # Khai báo biến mới thay cho alb_sg_id (vì ECS chỉ cần ecs_sg_id)
+variable "ecs_sg_id" {}
 variable "target_group_arn" {}
 variable "cpu" {}
 variable "memory" { }
@@ -21,6 +21,12 @@ resource "aws_ecr_repository" "repo" {
 
 resource "aws_ecs_cluster" "main" { name = "${var.project_name}-cluster" }
 
+# ✅ TẠO SẴN LOG GROUP ĐỂ APP KHÔNG PHẢI TỰ TẠO (TRÁNH LỖI QUYỀN)
+resource "aws_cloudwatch_log_group" "ecs_log_group" {
+  name              = "/ecs/${var.project_name}"
+  retention_in_days = 7
+}
+
 resource "aws_iam_role" "ecs_exec_role" {
   name = "${var.project_name}-exec-role"
   assume_role_policy = jsonencode({ Version="2012-10-17", Statement=[{Action="sts:AssumeRole", Effect="Allow", Principal={Service="ecs-tasks.amazonaws.com"}}] })
@@ -31,6 +37,7 @@ resource "aws_iam_role_policy_attachment" "ecs_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Cấp quyền FULL cho cả Execution Role và Task Role
 resource "aws_iam_role_policy" "ecs_extra_policy" {
   name = "${var.project_name}-extra-policy"
   role = aws_iam_role.ecs_exec_role.id
@@ -39,13 +46,8 @@ resource "aws_iam_role_policy" "ecs_extra_policy" {
     Statement = [
       {
         Effect = "Allow"
-        Action = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
-        Resource = "arn:aws:s3:::${var.s3_bucket_name}/*"
-      },
-      {
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
-        Resource = [var.secret_arn]
+        Action = ["s3:*", "secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret", "logs:*"]
+        Resource = "*"
       }
     ]
   })
@@ -58,6 +60,7 @@ resource "aws_ecs_task_definition" "backend_task" {
   cpu                      = var.cpu
   memory                   = var.memory
   execution_role_arn       = aws_iam_role.ecs_exec_role.arn
+  task_role_arn            = aws_iam_role.ecs_exec_role.arn
 
   container_definitions = jsonencode([{
     name      = "backend-container"
@@ -72,12 +75,15 @@ resource "aws_ecs_task_definition" "backend_task" {
         { name = "AWS_S3_BUCKET", value = var.s3_bucket_name },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "REDIS_HOST", value = var.redis_endpoint },
-        { name = "SECRET_ARN", value = var.secret_arn }
+        { name = "SECRET_ARN", value = var.secret_arn },
+        { name = "JWT_EXPIRATION", value = "86400000" }
     ]
     logConfiguration = {
         logDriver = "awslogs"
         options = {
-            "awslogs-group" = "/ecs/${var.project_name}", "awslogs-region" = var.aws_region, "awslogs-stream-prefix" = "ecs", "awslogs-create-group" = "true"
+            "awslogs-group" = aws_cloudwatch_log_group.ecs_log_group.name,
+            "awslogs-region" = var.aws_region,
+            "awslogs-stream-prefix" = "ecs"
         }
     }
   }])
@@ -91,7 +97,7 @@ resource "aws_ecs_service" "backend_service" {
   launch_type     = "FARGATE"
   network_configuration {
     subnets = var.public_subnets
-    security_groups = [var.ecs_sg_id] # Dùng biến truyền vào từ Root
+    security_groups = [var.ecs_sg_id]
     assign_public_ip = true
   }
   load_balancer {
