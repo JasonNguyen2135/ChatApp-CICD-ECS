@@ -4,7 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value; // ĐÃ BỔ SUNG DÒNG NÀY
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +33,11 @@ public class JwtUtils {
         return extractClaim(token, Claims::getSubject);
     }
 
+    // BỔ SUNG: Lấy UserId từ Token (Dùng cho Mobile)
+    public String getUserIdFromToken(String token) {
+        return extractClaim(token, claims -> claims.get("userId", String.class));
+    }
+
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
@@ -54,9 +59,17 @@ public class JwtUtils {
         return extractExpiration(token).before(new Date());
     }
 
+    // NẠP CHỒNG: Tạo token từ UserDetails
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, userDetails.getUsername());
+    }
+
+    // NẠP CHỒNG: Tạo token từ Email và UserId (Khớp với AuthController)
+    public String generateToken(String email, String userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        return createToken(claims, email);
     }
 
     private String createToken(Map<String, Object> claims, String subject) {
@@ -72,5 +85,10 @@ public class JwtUtils {
     public Boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    }
+
+    // BỔ SUNG: Kiểm tra token hợp lệ chỉ bằng String (Khớp với Filter)
+    public Boolean validateToken(String token) {
+        return !isTokenExpired(token);
     }
 }
