@@ -6,7 +6,6 @@ resource "aws_secretsmanager_secret" "app_secrets" {
   name = "${var.project_name}-secrets-${random_id.id.hex}"
   recovery_window_in_days = 0
 }
-
 resource "random_id" "id" {
   byte_length = 4
 }

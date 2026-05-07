@@ -1,10 +1,4 @@
-variable "project_name" {}
-variable "vpc_id" {}
-variable "private_subnets" { type = list(string) }
-variable "db_name" {}
-variable "db_username" {}
-variable "db_password" {}
-variable "ecs_sg_id" {}
+
 
 resource "aws_db_subnet_group" "postgres" {
   name       = "${var.project_name}-db-subnet-group"

@@ -1,4 +1,3 @@
-variable "project_name" {}
 
 resource "aws_s3_bucket" "chat_assets" {
   bucket = "${var.project_name}-chat-assets-${random_id.id.hex}"
