@@ -25,12 +25,12 @@ resource "aws_security_group" "ecs_sg" {
   description = "Security group for ECS Tasks"
   vpc_id      = module.vpc.vpc_id
 
-  # ✅ SỬA: Cho phép vào 8081 từ dải IP của VPC và chính ALB SG để đảm bảo thông suốt
+  # ✅ CHỈ CHO PHÉP: Traffic từ ALB đi vào ECS Tasks qua container port
   ingress {
     from_port       = var.container_port
     to_port         = var.container_port
     protocol        = "tcp"
-    cidr_blocks     = ["0.0.0.0/0"] # Mở rộng tạm thời để ALB dễ dàng tiếp cận
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   egress {
