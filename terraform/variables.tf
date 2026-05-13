@@ -18,3 +18,8 @@ variable "db_password" {
   description = "Database admin password"
   sensitive   = true
 }
+
+variable "jwt_secret" {
+  description = "JWT Secret Key"
+  sensitive   = true
+}

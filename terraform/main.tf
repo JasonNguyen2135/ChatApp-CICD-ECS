@@ -22,6 +22,7 @@ module "secrets" {
   source       = "./modules/secrets"
   project_name = var.project_name
   db_password  = var.db_password
+  jwt_secret   = var.jwt_secret
 }
 
 module "redis" {

@@ -18,8 +18,7 @@ import java.util.function.Function;
 @Component
 public class JwtUtils {
 
-    // THÊM GIÁ TRỊ MẶC ĐỊNH TRỰC TIẾP TRONG CODE ĐỂ CHỐNG CRASH
-    @Value("${jwt.secret:YourSuperSecretKeyForJwtAuthenticationWhichShouldBeLongEnough}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
     @Value("${jwt.expiration:86400000}")

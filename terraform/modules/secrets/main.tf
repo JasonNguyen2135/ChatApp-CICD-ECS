@@ -1,6 +1,6 @@
 variable "project_name" {}
 variable "db_password" {}
-variable "jwt_secret" { default = "YourSuperSecretKeyForJwtAuthenticationWhichShouldBeLongEnough" }
+variable "jwt_secret" {}
 
 resource "aws_secretsmanager_secret" "app_secrets" {
   name = "${var.project_name}-secrets-${random_id.id.hex}"
